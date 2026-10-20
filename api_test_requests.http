@@ -1,0 +1,164 @@
+### FoodLoop REST API Test Suite
+
+### 1. Health Check
+GET http://localhost:5000/api/health
+
+### 2. Login as Donor (Chef Sharma)
+# @name donorLogin
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "donor@foodloop.org",
+  "password": "Password123!"
+}
+
+### Store token
+@donorToken = {{donorLogin.response.body.token}}
+
+### 3. Login as Recipient NGO (Sister Teresa - Hope Shelter)
+# @name ngoLogin
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "ngo@foodloop.org",
+  "password": "Password123!"
+}
+
+### Store token
+@ngoToken = {{ngoLogin.response.body.token}}
+
+### 4. Login as Volunteer Courier (Alex Courier)
+# @name volunteerLogin
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "volunteer@foodloop.org",
+  "password": "Password123!"
+}
+
+### Store token
+@volToken = {{volunteerLogin.response.body.token}}
+
+### 5. Login as Administrator
+# @name adminLogin
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@foodloop.org",
+  "password": "Password123!"
+}
+
+### Store token
+@adminToken = {{adminLogin.response.body.token}}
+
+### 6. Create Surplus Food Donation (Donor)
+# @name createDonation
+POST http://localhost:5000/api/donations
+Authorization: Bearer {{donorToken}}
+Content-Type: application/json
+
+{
+  "foodTitle": "50 Hot Vegetarian Meals",
+  "category": "prepared_meals",
+  "quantity": 50,
+  "unit": "portions",
+  "estimatedServings": 50,
+  "dietaryClassification": ["vegetarian"],
+  "preparationTime": "2026-10-19T16:00:00.000Z",
+  "collectionWindow": {
+    "startTime": "2026-10-19T16:30:00.000Z",
+    "deadline": "2026-10-19T21:30:00.000Z"
+  },
+  "storageAndHandling": {
+    "storageType": "hot_holding",
+    "handlingInstructions": "Keep insulated"
+  },
+  "safetyDeclaration": {
+    "isSafeAndEdible": true,
+    "storedAtSafeTemperature": true,
+    "preparedWithCleanUtensils": true
+  },
+  "pickupAddress": {
+    "formattedAddress": "Connaught Place, New Delhi"
+  },
+  "coordinates": [77.2197, 28.6328]
+}
+
+@newDonationId = {{createDonation.response.body.donation._id}}
+
+### 7. Run Feasibility-First Matching Engine
+GET http://localhost:5000/api/matching/{{newDonationId}}
+Authorization: Bearer {{donorToken}}
+
+### 8. Claim Donation (Recipient NGO)
+# @name claimDonation
+POST http://localhost:5000/api/donations/{{newDonationId}}/requests
+Authorization: Bearer {{ngoToken}}
+Content-Type: application/json
+
+{
+  "requestedQuantity": 50,
+  "recipientNotes": "Dinner service for shelter"
+}
+
+@requestId = {{claimDonation.response.body.donationRequest._id}}
+
+### 9. Accept Request (Donor)
+# @name acceptRequest
+PATCH http://localhost:5000/api/requests/{{requestId}}/accept
+Authorization: Bearer {{donorToken}}
+Content-Type: application/json
+
+{
+  "donorNotes": "Approved for collection"
+}
+
+@pickupId = {{acceptRequest.response.body.pickup._id}}
+@pickupOtp = {{acceptRequest.response.body.pickup.pickupCode}}
+
+### 10. View Recipient Delivery OTP Code
+GET http://localhost:5000/api/pickups/{{pickupId}}
+Authorization: Bearer {{ngoToken}}
+
+### 11. Courier Accepts Task
+POST http://localhost:5000/api/pickups/{{pickupId}}/assign
+Authorization: Bearer {{volToken}}
+
+### 12. Courier Updates Status to EN_ROUTE
+PATCH http://localhost:5000/api/pickups/{{pickupId}}/status
+Authorization: Bearer {{volToken}}
+Content-Type: application/json
+
+{
+  "status": "EN_ROUTE"
+}
+
+### 13. Courier Updates Status to ARRIVED_AT_DONOR
+PATCH http://localhost:5000/api/pickups/{{pickupId}}/status
+Authorization: Bearer {{volToken}}
+Content-Type: application/json
+
+{
+  "status": "ARRIVED_AT_DONOR"
+}
+
+### 14. Courier Verifies Donor Pickup OTP
+POST http://localhost:5000/api/pickups/{{pickupId}}/verify-handover
+Authorization: Bearer {{volToken}}
+Content-Type: application/json
+
+{
+  "handoverType": "pickup",
+  "code": "{{pickupOtp}}"
+}
+
+### 15. View System Impact Analytics
+GET http://localhost:5000/api/analytics/overview
+
+### 16. Admin Reviews Audit Trail
+GET http://localhost:5000/api/admin/audit-logs?limit=10
+Authorization: Bearer {{adminToken}}
