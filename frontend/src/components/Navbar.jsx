@@ -15,6 +15,8 @@ import {
   Sparkles,
   MapPin,
   ClipboardList,
+  Menu,
+  X,
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -23,6 +25,7 @@ export default function Navbar() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showDemoMenu, setShowDemoMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -359,8 +362,83 @@ export default function Navbar() {
                 </Link>
               </div>
             )}
+
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 md:hidden text-stone-600 hover:text-stone-900 rounded-lg hover:bg-stone-100 transition-colors"
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Navigation Drawer */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-stone-200 py-3 space-y-1">
+            {navLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`block px-3 py-2 rounded-lg text-sm font-medium ${
+                  location.pathname === link.path
+                    ? 'bg-forest-50 text-forest-800 font-semibold'
+                    : 'text-stone-700 hover:bg-stone-50'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+
+            {user && (
+              <>
+                <Link
+                  to="/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-3 py-2 rounded-lg text-sm font-medium ${
+                    location.pathname === '/dashboard'
+                      ? 'bg-forest-50 text-forest-800 font-semibold'
+                      : 'text-stone-700 hover:bg-stone-50'
+                  }`}
+                >
+                  Dashboard
+                </Link>
+
+                {user.role === 'donor' && (
+                  <Link
+                    to="/donations/create"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3 py-2 rounded-lg text-sm font-semibold text-forest-800 bg-forest-50 hover:bg-forest-100"
+                  >
+                    + Post Surplus Food
+                  </Link>
+                )}
+
+                {user.role === 'volunteer' && (
+                  <Link
+                    to="/pickups"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3 py-2 rounded-lg text-sm font-medium text-blue-700 hover:bg-blue-50"
+                  >
+                    Courier Task Board
+                  </Link>
+                )}
+
+                {user.role === 'admin' && (
+                  <Link
+                    to="/admin/verifications"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3 py-2 rounded-lg text-sm font-medium text-purple-700 hover:bg-purple-50"
+                  >
+                    Admin Verification Hub
+                  </Link>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );

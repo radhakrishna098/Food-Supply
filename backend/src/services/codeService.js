@@ -22,9 +22,14 @@ class CodeService {
    * Verifies an entered code against the stored hash
    */
   static verifyCode(enteredCode, storedHash) {
-    if (!enteredCode || !storedHash) return false;
+    if (!enteredCode || !storedHash || typeof enteredCode !== 'string' || typeof storedHash !== 'string') {
+      return false;
+    }
     const computedHash = this.hashCode(enteredCode.trim());
-    return crypto.timingSafeEqual(Buffer.from(computedHash), Buffer.from(storedHash));
+    const bufA = Buffer.from(computedHash);
+    const bufB = Buffer.from(storedHash);
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
   }
 }
 

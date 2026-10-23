@@ -46,6 +46,19 @@ exports.createRequest = async (req, res, next) => {
       });
     }
 
+    // Prevent duplicate active claims from same organization
+    const existingClaim = await DonationRequest.findOne({
+      donation: donationId,
+      recipientOrg: org._id,
+      status: { $in: ['PENDING', 'ACCEPTED'] },
+    });
+    if (existingClaim) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your organization already has an active claim request for this donation',
+      });
+    }
+
     const claimQuantity = Number(requestedQuantity) || donation.remainingQuantity;
     if (claimQuantity <= 0 || claimQuantity > donation.remainingQuantity) {
       return res.status(400).json({
@@ -316,9 +329,9 @@ exports.rejectRequest = async (req, res, next) => {
     // Re-credit quantity back to donation
     const donation = await Donation.findById(request.donation._id);
     if (donation) {
-      donation.remainingQuantity += request.requestedQuantity;
+      donation.remainingQuantity = Math.min(donation.quantity, donation.remainingQuantity + request.requestedQuantity);
       if (['REQUESTED', 'PARTIALLY_CLAIMED'].includes(donation.status)) {
-        donation.status = 'AVAILABLE';
+        donation.status = donation.remainingQuantity === donation.quantity ? 'AVAILABLE' : 'PARTIALLY_CLAIMED';
       }
       await donation.save();
     }
@@ -334,14 +347,17 @@ exports.rejectRequest = async (req, res, next) => {
     }
 
     // Notify Recipient NGO
-    await NotificationService.notify({
-      recipient: request.requestedBy,
-      type: 'REQUEST_REJECTED',
-      title: 'Donation Request Declined',
-      message: `Your request for ${donation.foodTitle} was declined: ${request.donorNotes}`,
-      relatedDonation: donation._id,
-      relatedRequest: request._id,
-    });
+    const recipientUserId = request.requestedBy?._id || request.requestedBy;
+    if (recipientUserId && donation) {
+      await NotificationService.notify({
+        recipient: recipientUserId,
+        type: 'REQUEST_REJECTED',
+        title: 'Donation Request Declined',
+        message: `Your request for ${donation.foodTitle} was declined: ${request.donorNotes}`,
+        relatedDonation: donation._id,
+        relatedRequest: request._id,
+      });
+    }
 
     await AuditService.log({
       actor: req.user._id,

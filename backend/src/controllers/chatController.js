@@ -117,11 +117,11 @@ exports.sendMessage = async (req, res, next) => {
       // 3. Notify assigned volunteer if exists
       const pickup = await Pickup.findOne({
         donation: donation._id,
-        status: { $in: ['CLAIMED', 'IN_TRANSIT', 'COLLECTED'] },
+        status: { $in: ['ACCEPTED_BY_VOLUNTEER', 'EN_ROUTE', 'ARRIVED_AT_DONOR', 'COLLECTED', 'ARRIVED_AT_RECIPIENT'] },
       });
-      if (pickup && pickup.volunteer && pickup.volunteer.toString() !== req.user._id.toString()) {
+      if (pickup && pickup.assignedVolunteer && pickup.assignedVolunteer.toString() !== req.user._id.toString()) {
         await NotificationService.notify({
-          recipient: pickup.volunteer,
+          recipient: pickup.assignedVolunteer,
           type: 'NEW_MESSAGE',
           title: `Pickup coordination for ${donation.foodTitle}`,
           message: `${req.user.name}: "${text.length > 60 ? text.substring(0, 60) + '...' : text}"`,

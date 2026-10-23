@@ -183,20 +183,125 @@ Open `http://localhost:5173` in your browser.
 
 ---
 
-## 8. Environmental Impact Methodology
+## 9. Render & MongoDB Atlas Production Deployment Guide
 
-FoodLoop calculates environmental and social impact strictly from verified, completed deliveries:
-- **Rescued Food**: Only counted once the Recipient NGO enters the 6-digit Delivery OTP. Cancelled or expired batches are excluded.
-- **Emissions Avoidance**: Based on the UN Food and Agriculture Organization (FAO) Food Wastage Footprint benchmark, avoiding 1 prepared meal portion from reaching landfills prevents an estimated **~0.85 kg CO₂ equivalent**.
+FoodLoop is architected for continuous zero-downtime deployment as two decoupled cloud services:
+1. **Backend Web Service**: Node.js/Express server connecting to MongoDB Atlas.
+2. **Frontend Static Site**: Vite/React SPA with automated rewrite fallbacks.
+
+```mermaid
+flowchart LR
+    Client["User Browser"] -->|"HTTPS Requests"| Frontend["Render Static Site\n(dist / SPA _redirects)"]
+    Frontend -->|"VITE_API_BASE_URL (/api)"| Backend["Render Web Service\n(Node.js Express Engine)"]
+    Backend -->|"Mongoose TLS (Port 27017)"| Atlas[("MongoDB Atlas Cloud\n(Encrypted Database)")]
+```
+
+### Option A: One-Click Infrastructure as Code (Render Blueprint)
+1. Push this repository to GitHub.
+2. In the Render Dashboard, click **New +** → **Blueprint**.
+3. Select your repository. Render automatically reads `render.yaml` and provisions both services.
+4. Enter your `MONGODB_URI` from MongoDB Atlas when prompted. Both services will deploy and connect automatically.
 
 ---
 
-## 9. Known Limitations & Roadmap
+### Option B: Step-by-Step Manual Dashboard Setup
 
-- **Simulated Real-Time Couriers**: In local demonstration mode, courier locations are simulated along the route coordinates. In production, real-time WebSockets and mobile GPS updates would be integrated.
-- **SMS / Push Fallback**: The current prototype uses in-app polling notifications. SMS gateways (e.g. Twilio) can be plugged in for couriers in low-connectivity areas.
-- **Cold-Chain Sensor Integrations**: IoT temperature loggers can be linked to the handover verification workflow for continuous chilled monitoring.
+#### Step 1: Provision MongoDB Atlas Cluster
+1. Sign in to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+2. Create an **M0 Free Shared Cluster** in your preferred region.
+3. Under **Security → Database Access**:
+   - Create a database user (e.g., `foodloop_app`).
+   - Assign built-in role: `Read and write to any database`.
+   - Store the password securely.
+4. Under **Security → Network Access**:
+   - Click **Add IP Address** → choose **Allow Access from Anywhere** (`0.0.0.0/0`) because Render dynamic outbound IPs rotate across cloud ranges.
+5. Under **Deployments → Database → Connect**:
+   - Choose **Drivers** (Node.js).
+   - Copy your connection string:
+     `mongodb+srv://foodloop_app:<PASSWORD>@<cluster>.mongodb.net/foodloop?retryWrites=true&w=majority`
+   - Replace `<PASSWORD>` with your database user password.
+
+#### Step 2: Deploy Backend Web Service on Render
+1. In the Render Dashboard, click **New +** → **Web Service**.
+2. Connect your GitHub repository.
+3. Configure the service settings:
+   - **Name**: `foodloop-backend`
+   - **Root Directory**: `backend`
+   - **Environment**: `Node`
+   - **Region**: Choose the region closest to your MongoDB Atlas cluster.
+   - **Branch**: `main`
+   - **Build Command**: `npm ci`
+   - **Start Command**: `npm start`
+   - **Health Check Path**: `/api/health`
+4. Under **Environment Variables**, add:
+   | Key | Value | Description |
+   | :--- | :--- | :--- |
+   | `NODE_ENV` | `production` | Enables production security & logging modes |
+   | `PORT` | `10000` | Port assigned by Render host interface |
+   | `MONGODB_URI` | `mongodb+srv://...` | Your Atlas connection string |
+   | `JWT_SECRET` | *(Random 32+ char string)* | Cryptographically random production secret |
+   | `JWT_EXPIRES_IN` | `7d` | Session lifespan |
+   | `FRONTEND_URL` | `https://foodloop-frontend.onrender.com` | Deployed frontend domain (without trailing slash) |
+   | `RATE_LIMIT_WINDOW_MS` | `900000` | 15 minutes window |
+   | `RATE_LIMIT_MAX` | `500` | Max requests per window |
+5. Click **Deploy Web Service**.
+6. When deployment finishes, test the health check in your browser:  
+   `https://your-backend.onrender.com/api/health`  
+   Expected JSON: `{"status":"healthy","database":"connected",...}`
+
+#### Step 3: Deploy Frontend Static Site on Render
+1. In the Render Dashboard, click **New +** → **Static Site**.
+2. Connect your GitHub repository.
+3. Configure the service settings:
+   - **Name**: `foodloop-frontend`
+   - **Root Directory**: `frontend`
+   - **Branch**: `main`
+   - **Build Command**: `npm ci && npm run build`
+   - **Publish Directory**: `dist`
+4. Under **Environment Variables**, add:
+   | Key | Value | Description |
+   | :--- | :--- | :--- |
+   | `VITE_API_BASE_URL` | `https://your-backend.onrender.com/api` | Your deployed backend URL |
+5. Note: SPA fallback rewrite is pre-configured via `frontend/public/_redirects` (`/* /index.html 200`), ensuring page refreshes on nested routes work cleanly without 404 errors.
+6. Click **Deploy Static Site**.
+7. Once the frontend URL is generated, return to the **Backend Web Service** settings and ensure `FRONTEND_URL` matches the exact frontend URL.
 
 ---
 
-© 2026 FoodLoop — Intelligent Surplus Food Rescue Network. Open and auditable.
+## 10. Post-Deployment Manual Verification Checklist
+
+After deploying the services to Render, perform this verification checklist:
+
+- [ ] **1. Service Health Verification**:  
+  Navigate to `https://<your-backend>.onrender.com/api/health`. Confirm HTTP 200 with `status: "healthy"` and `database: "connected"`.
+- [ ] **2. Static Site Loading**:  
+  Open `https://<your-frontend>.onrender.com`. Confirm the homepage loads with hero banner, live statistics, and interactive controls.
+- [ ] **3. SPA Routing & Direct URL Refresh**:  
+  Navigate to `https://<your-frontend>.onrender.com/how-it-works` and press browser refresh (F5). Confirm the page reloads cleanly without 404 errors.
+- [ ] **4. User Registration**:  
+  Register a new test user as a **Food Donor** or **Recipient NGO**. Verify that registration succeeds, JWT token is issued, and redirect lands on `/dashboard`.
+- [ ] **5. Role-Based Login & Session Restoration**:  
+  Log out and log back in using the credentials. Refresh the browser tab and verify the session is restored without an infinite reload loop.
+- [ ] **6. Post a Surplus Donation**:  
+  As a donor, visit `/donations/create`, fill out quantity, future deadline, mandatory safety declarations, and click submit. Verify redirect to the Smart Matching Center.
+- [ ] **7. Recipient Claim Submission**:  
+  Switch to a verified Recipient NGO account, open the donation, and submit a claim for available portions. Confirm that remaining quantity decrements atomically and donor is notified.
+- [ ] **8. Donor Claim Acceptance**:  
+  As the donor, navigate to `/requests` or dashboard, accept the claim, and note the 6-digit Pickup Handover OTP code.
+- [ ] **9. Volunteer Mission Progression & Handover Verification**:  
+  Log in as a volunteer, claim the available mission from `/pickups`, step status to `ARRIVED_AT_DONOR`, and submit the donor's 6-digit OTP. Confirm transition to `COLLECTED`. Advance to `ARRIVED_AT_RECIPIENT` and submit the recipient's 6-digit OTP. Confirm final status transitions to `DELIVERED`.
+- [ ] **10. Environmental Impact Verification**:  
+  Navigate to `/impact`. Confirm that rescued servings and CO2e avoidance metrics update strictly upon verified delivery.
+
+---
+
+## 11. Known Limitations & Roadmap
+
+- **Simulated Real-Time Couriers**: Courier locations along transit paths are currently estimated using Great-Circle Haversine calculations and urban speed approximations. In high-density production, integration with background GPS mobile apps and WebSockets can be enabled.
+- **SMS / Push Fallback**: The platform provides in-app live notifications. Twilio or Firebase Cloud Messaging can be added for courier SMS dispatch.
+- **Cold-Chain Sensor Integrations**: Handover workflows can be augmented with Bluetooth Low Energy (BLE) temperature data loggers.
+
+---
+
+© 2026 FoodLoop — Intelligent Surplus Food Rescue Network. Open, secure, and deployment-ready.
+

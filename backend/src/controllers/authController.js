@@ -4,7 +4,17 @@ const Organization = require('../models/Organization');
 const AuditService = require('../services/auditService');
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'foodloop_dev_jwt_secret_key_random_long_token_2024', {
+  const secret =
+    process.env.JWT_SECRET ||
+    (process.env.NODE_ENV !== 'production'
+      ? 'foodloop_dev_jwt_secret_key_random_long_token_2024'
+      : null);
+
+  if (!secret) {
+    throw new Error('JWT_SECRET is missing from server configuration');
+  }
+
+  return jwt.sign({ id }, secret, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
 };
@@ -36,6 +46,14 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Name, email, password, and role are required fields',
+      });
+    }
+
+    const allowedPublicRoles = ['donor', 'recipient', 'volunteer'];
+    if (!allowedPublicRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid registration role. Public registration is only available for roles: ${allowedPublicRoles.join(', ')}`,
       });
     }
 
@@ -165,6 +183,13 @@ exports.login = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: 'Your account has been suspended by administrators',
+      });
+    }
+
+    if (user.accountStatus === 'rejected') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account application was rejected. Please contact support.',
       });
     }
 

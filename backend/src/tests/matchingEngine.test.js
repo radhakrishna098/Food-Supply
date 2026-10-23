@@ -10,6 +10,40 @@ describe('FoodLoop Matching Engine — Feasibility-First Decision Tests', () => 
     if (mongoose.connection.readyState === 0) {
       await mongoose.connect(uri);
     }
+    // Ensure test donations have fresh collection windows relative to current run time
+    const now = new Date();
+    await Donation.updateMany(
+      { foodTitle: /50 Gourmet Vegetarian Meal Portions|Frozen Salmon/ },
+      {
+        $set: {
+          'collectionWindow.startTime': new Date(now.getTime() - 30 * 60 * 1000),
+          'collectionWindow.deadline': new Date(now.getTime() + 4 * 60 * 60 * 1000),
+          status: 'AVAILABLE',
+        },
+      }
+    );
+
+    // Ensure test organizations have baseline capacities for deterministic matching tests
+    await Organization.updateOne(
+      { name: /Hope Community Shelter/ },
+      {
+        $set: {
+          capacityResetDate: now,
+          currentDailyClaimedServings: 20,
+        },
+      }
+    );
+
+    // Ensure low-capacity test NGO has today's claimed capacity preserved
+    await Organization.updateOne(
+      { name: /Sunrise Children Haven/ },
+      {
+        $set: {
+          capacityResetDate: now,
+          currentDailyClaimedServings: 42,
+        },
+      }
+    );
   });
 
   afterAll(async () => {

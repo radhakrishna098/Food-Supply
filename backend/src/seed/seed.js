@@ -13,6 +13,12 @@ const CodeService = require('../services/codeService');
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/foodloop';
 
 async function seedDatabase() {
+  if (process.env.NODE_ENV === 'production' && !process.argv.includes('--force-production-seed')) {
+    console.error('CRITICAL: Seeding demo data in production environment is prohibited.');
+    console.error('If you explicitly intend to wipe and seed production data, provide --force-production-seed');
+    process.exit(1);
+  }
+
   try {
     await mongoose.connect(MONGODB_URI);
     console.log('[Seed]: Connected to MongoDB. Clearing previous collections...');

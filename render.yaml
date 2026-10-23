@@ -1,0 +1,53 @@
+services:
+  # ========================================================
+  # FoodLoop Backend - Web Service
+  # ========================================================
+  - type: web
+    name: foodloop-backend
+    env: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: foodloop-frontend
+          property: host
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX
+        value: 500
+
+  # ========================================================
+  # FoodLoop Frontend - Static Site
+  # ========================================================
+  - type: web
+    name: foodloop-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: foodloop-backend
+          property: host
+          path: /api

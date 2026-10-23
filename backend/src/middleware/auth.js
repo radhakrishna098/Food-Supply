@@ -23,7 +23,20 @@ exports.protect = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'foodloop_dev_jwt_secret_key_random_long_token_2024');
+    const secret =
+      process.env.JWT_SECRET ||
+      (process.env.NODE_ENV !== 'production'
+        ? 'foodloop_dev_jwt_secret_key_random_long_token_2024'
+        : null);
+
+    if (!secret) {
+      return res.status(500).json({
+        success: false,
+        message: 'Internal configuration error: JWT secret not defined',
+      });
+    }
+
+    const decoded = jwt.verify(token, secret);
     const user = await User.findById(decoded.id);
 
     if (!user) {
@@ -37,6 +50,13 @@ exports.protect = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: 'Your account has been suspended. Please contact platform administrators.',
+      });
+    }
+
+    if (user.accountStatus === 'rejected') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account application has been rejected.',
       });
     }
 

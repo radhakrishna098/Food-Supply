@@ -421,9 +421,12 @@ exports.verifyHandover = async (req, res, next) => {
       await DonationRequest.findByIdAndUpdate(pickup.donationRequest._id, { status: 'COMPLETED' });
 
       // Increment volunteer completed deliveries
-      await User.findByIdAndUpdate(req.user._id, {
-        $inc: { 'volunteerProfile.completedDeliveriesCount': 1 },
-      });
+      const volunteerIdToCredit = pickup.assignedVolunteer || (req.user.role === 'volunteer' ? req.user._id : null);
+      if (volunteerIdToCredit) {
+        await User.findByIdAndUpdate(volunteerIdToCredit, {
+          $inc: { 'volunteerProfile.completedDeliveriesCount': 1 },
+        });
+      }
 
       // Notify parties
       await NotificationService.notify({
