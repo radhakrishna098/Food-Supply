@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import api from '../services/api';
 import {
   UtensilsCrossed,
   Bell,
@@ -17,6 +18,8 @@ import {
   ClipboardList,
   Menu,
   X,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -26,6 +29,8 @@ export default function Navbar() {
   const [showDemoMenu, setShowDemoMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [switchingEmail, setSwitchingEmail] = useState(null);
+  const [switchFeedback, setSwitchFeedback] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -36,11 +41,34 @@ export default function Navbar() {
 
   const handleQuickLogin = async (email) => {
     try {
-      await login(email, 'Password123!');
+      setSwitchingEmail(email);
+      setSwitchFeedback({ type: 'info', text: 'Signing in...' });
+
+      try {
+        await login(email, 'Password123!');
+      } catch (loginErr) {
+        // If account not initialized on remote/fresh database, trigger on-demand init and retry
+        console.warn('Initial login failed, attempting demo account auto-provisioning...', loginErr.message);
+        setSwitchFeedback({ type: 'info', text: 'Auto-provisioning demo accounts...' });
+        await api.post('/auth/init-demo-accounts');
+        await login(email, 'Password123!');
+      }
+
       setShowDemoMenu(false);
-      navigate('/dashboard');
+      setMobileMenuOpen(false);
+      setSwitchFeedback(null);
+
+      if (email === 'admin@foodloop.org') {
+        navigate('/admin/verifications');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       console.error('Quick switch failed', err);
+      const errMsg = err.response?.data?.message || err.message || 'Login failed. Please check backend connection.';
+      setSwitchFeedback({ type: 'error', text: errMsg });
+    } finally {
+      setSwitchingEmail(null);
     }
   };
 
@@ -149,61 +177,127 @@ export default function Navbar() {
               </button>
 
               {showDemoMenu && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-stone-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-stone-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
                   <div className="px-3 py-1 border-b border-stone-100 mb-1">
                     <p className="text-[11px] font-bold uppercase text-stone-400">Quick Test Switcher</p>
                     <p className="text-xs text-stone-600">Instantly switch between demo roles</p>
                   </div>
+
+                  {switchFeedback && (
+                    <div
+                      className={`mx-3 my-1.5 p-2 rounded-lg text-xs flex items-center gap-2 ${
+                        switchFeedback.type === 'error'
+                          ? 'bg-red-50 text-red-700 border border-red-200'
+                          : 'bg-cream-100 text-stone-700 border border-stone-200'
+                      }`}
+                    >
+                      {switchingEmail && <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-terracotta-500" />}
+                      <span className="leading-tight">{switchFeedback.text}</span>
+                    </div>
+                  )}
+
                   <button
+                    disabled={!!switchingEmail}
                     onClick={() => handleQuickLogin('donor@foodloop.org')}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-forest-50 flex items-center justify-between"
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-forest-50 flex items-center justify-between disabled:opacity-50"
                   >
                     <div>
                       <p className="font-semibold text-stone-800">Chef Sharma (Restaurant)</p>
                       <p className="text-[10px] text-stone-500">Spice Garden • Donor</p>
                     </div>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">Donor</span>
+                    {switchingEmail === 'donor@foodloop.org' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                    ) : (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-medium">Donor</span>
+                    )}
                   </button>
+
                   <button
+                    disabled={!!switchingEmail}
                     onClick={() => handleQuickLogin('ngo@foodloop.org')}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-forest-50 flex items-center justify-between"
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-forest-50 flex items-center justify-between disabled:opacity-50"
                   >
                     <div>
                       <p className="font-semibold text-stone-800">Hope Community Shelter</p>
                       <p className="text-[10px] text-stone-500">Verified Shelter • NGO</p>
                     </div>
-                    <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">NGO</span>
+                    {switchingEmail === 'ngo@foodloop.org' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                    ) : (
+                      <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium">NGO</span>
+                    )}
                   </button>
+
                   <button
+                    disabled={!!switchingEmail}
                     onClick={() => handleQuickLogin('volunteer@foodloop.org')}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-forest-50 flex items-center justify-between"
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-forest-50 flex items-center justify-between disabled:opacity-50"
                   >
                     <div>
                       <p className="font-semibold text-stone-800">Alex Courier</p>
                       <p className="text-[10px] text-stone-500">Volunteer Courier</p>
                     </div>
-                    <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Courier</span>
+                    {switchingEmail === 'volunteer@foodloop.org' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                    ) : (
+                      <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-medium">Courier</span>
+                    )}
                   </button>
+
                   <button
+                    disabled={!!switchingEmail}
                     onClick={() => handleQuickLogin('admin@foodloop.org')}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-forest-50 flex items-center justify-between"
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 flex items-center justify-between disabled:opacity-50"
                   >
                     <div>
                       <p className="font-semibold text-stone-800">Platform Administrator</p>
                       <p className="text-[10px] text-stone-500">Full audit & verification</p>
                     </div>
-                    <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded">Admin</span>
+                    {switchingEmail === 'admin@foodloop.org' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                    ) : (
+                      <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-medium">Admin</span>
+                    )}
                   </button>
+
                   <div className="border-t border-stone-100 mt-1 pt-1">
                     <button
+                      disabled={!!switchingEmail}
                       onClick={() => handleQuickLogin('unverified@foodloop.org')}
-                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-red-50 flex items-center justify-between"
+                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-red-50 flex items-center justify-between disabled:opacity-50"
                     >
                       <div>
                         <p className="font-semibold text-stone-700">Eastside Pantry</p>
                         <p className="text-[10px] text-red-600">Pending Verification</p>
                       </div>
-                      <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Unverified</span>
+                      {switchingEmail === 'unverified@foodloop.org' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-red-600" />
+                      ) : (
+                        <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">Unverified</span>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="border-t border-stone-100 mt-1 pt-1.5 px-3 flex justify-between items-center text-[10px] text-stone-400">
+                    <span>Default: Password123!</span>
+                    <button
+                      type="button"
+                      disabled={!!switchingEmail}
+                      onClick={async () => {
+                        try {
+                          setSwitchingEmail('sync');
+                          setSwitchFeedback({ type: 'info', text: 'Syncing demo accounts with database...' });
+                          await api.post('/auth/init-demo-accounts');
+                          setSwitchFeedback({ type: 'info', text: 'All accounts verified and ready!' });
+                        } catch (e) {
+                          setSwitchFeedback({ type: 'error', text: 'Sync failed: ' + (e.message || 'Error') });
+                        } finally {
+                          setSwitchingEmail(null);
+                        }
+                      }}
+                      className="text-terracotta-600 hover:text-terracotta-800 font-semibold underline disabled:opacity-50"
+                    >
+                      Sync Accounts
                     </button>
                   </div>
                 </div>

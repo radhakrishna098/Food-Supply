@@ -5,7 +5,6 @@ const connectDB = require('./config/db');
 
 const PORT = Number(process.env.PORT) || 5000;
 const HOST = '0.0.0.0';
-
 // In production, enforce critical security configuration
 if (process.env.NODE_ENV === 'production') {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
@@ -16,9 +15,16 @@ if (process.env.NODE_ENV === 'production') {
 
 let server;
 
-// Connect to MongoDB and start HTTP server
+// Connect to MongoDB, ensure system accounts, and start HTTP server
 connectDB()
-  .then(() => {
+  .then(async () => {
+    try {
+      const { ensureSystemAccounts } = require('./services/systemInitService');
+      await ensureSystemAccounts();
+    } catch (initErr) {
+      console.warn('[FoodLoop SystemInit]: Warning during system accounts initialization:', initErr.message);
+    }
+
     server = app.listen(PORT, HOST, () => {
       console.log(`[FoodLoop Engine]: Server active on ${HOST}:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
       console.log(`[FoodLoop Engine]: Health check at http://localhost:${PORT}/api/health`);

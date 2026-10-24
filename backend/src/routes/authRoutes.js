@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, getMe, updateProfile } = require('../controllers/authController');
+const { register, login, getMe, updateProfile, initDemoAccounts } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
 router.post('/register', register);
 router.post('/login', login);
+router.post('/init-demo-accounts', initDemoAccounts);
+router.get('/init-demo-accounts', initDemoAccounts);
 router.get('/me', protect, getMe);
 router.patch('/profile', protect, updateProfile);
 

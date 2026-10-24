@@ -266,3 +266,21 @@ exports.updateProfile = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Initialize demo and system accounts on-demand
+// @route   POST /api/auth/init-demo-accounts, GET /api/auth/init-demo-accounts
+// @access  Public
+exports.initDemoAccounts = async (req, res, next) => {
+  try {
+    const { ensureSystemAccounts } = require('../services/systemInitService');
+    const result = await ensureSystemAccounts();
+    res.json({
+      success: true,
+      message: 'System and demo accounts initialized successfully',
+      result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

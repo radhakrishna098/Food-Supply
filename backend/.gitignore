@@ -1,5 +1,84 @@
 # Dependencies
 node_modules/
+<<<<<<< HEAD
+**/node_modules/
+.pnp
+.pnp.js
+
+# Production build outputs
+dist/
+**/dist/
+build/
+**/build/
+out/
+.next/
+
+# Environment and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+**/.env
+!**/.env.example
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing & Coverage
+coverage/
+**/coverage/
+.nyc_output/
+reports/
+
+# Cache directories
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+.vite/
+**/.vite/
+
+# Editor and IDE configurations
+.vscode/
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# Temporary files and dumps
+tmp/
+temp/
+*.tmp
+*.temp
+scratch/
+*.dump
+=======
 
 # Environment files
 .env
@@ -16,3 +95,4 @@ coverage/
 # Misc
 .DS_Store
 Thumbs.db
+>>>>>>> 3b9952c (Prepare FoodLoop for deployment)
